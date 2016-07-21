@@ -1,109 +1,67 @@
-// The midi notes of a scale
-var notes = [ 60, 62, 64, 65, 67, 69, 71];
-
-// For automatically playing the song
-var index = 0;
-var song = [ 
-  { note: 4, duration: 400, display: "D" },  
-  { note: 0, duration: 200, display: "G" },  
-  { note: 1, duration: 200, display: "A" },  
-  { note: 2, duration: 200, display: "B" }, 
-  { note: 3, duration: 200, display: "C" },  
-  { note: 4, duration: 400, display: "D" },  
-  { note: 0, duration: 400, display: "G" },  
-  { note: 0, duration: 400, display: "G" }
-];
-var trigger = 0;
-var autoplay = false;
-var osc;
+var carrier; // this is the oscillator we will hear
+var modulator; // this oscillator will modulate the amplitude of the carrier
+var fft; // we'll visualize the waveform 
 
 function setup() {
-  createCanvas(720, 400);
-  var div = createDiv("Click to play notes or ")
-  div.id("instructions");
-  var button = createA("#","play song automatically.");
-  button.parent("instructions");
-  // Trigger automatically playing
-  button.mousePressed(function() {
-    if (!autoplay) {
-      index = 0;
-      autoplay = true;
-    }
-  });
-  
-  // A triangle oscillator
-  osc = new p5.TriOsc();
-  // Start silent
-  osc.start();
-  osc.amp(0);
-}
+  createCanvas(800,400);
+  noFill();
+  background(30); // alpha
 
-// A function to play a note
-function playNote(note, duration) {
-  osc.freq(midiToFreq(note));
-  // Fade it in
-  osc.fade(0.5,0.2);
-  
-  // If we sest a duration, fade it out
-  if (duration) {
-    setTimeout(function() {
-      osc.fade(0,0.2);
-    }, duration-50);
-  }
+
+  carrier = new p5.Oscillator(); // connects to master output by default
+  carrier.freq(340);
+  carrier.amp(0);
+  // carrier's amp is 0 by default, giving our modulator total control
+
+  carrier.start();
+
+  modulator = new p5.Oscillator('triangle');
+  modulator.disconnect();  // disconnect the modulator from master output
+  modulator.freq(5);
+  modulator.amp(1);
+  modulator.start();
+
+  // Modulate the carrier's amplitude with the modulator
+  // Optionally, we can scale the signal.
+  carrier.amp(modulator.scale(-1,1,1,-1));
+
+  // create an fft to analyze the audio
+  fft = new p5.FFT();
 }
 
 function draw() {
-  
-  // If we are autoplaying and it's time for the next note
-  if (autoplay && millis() > trigger){
-    playNote(notes[song[index].note], song[index].duration);
-    trigger = millis() + song[index].duration;
-    // Move to the next note
-    index ++;
-  // We're at the end, stop autoplaying.
-  } else if (index >= song.length) {
-    autoplay = false;
-  }
+  background(30,30,30,100); // alpha
 
-  
-  // Draw a keyboard
+  // map mouseY to moodulator freq between 0 and 20hz
+  var modFreq = map(mouseY, 0, height, 20, 0);
+  modulator.freq(modFreq);
 
-  // The width for each key
-  var w = width / notes.length;
-  for (var i = 0; i < notes.length; i++) {
-    var x = i * w;
-    // If the mouse is over the key
-    if (mouseX > x && mouseX < x + w && mouseY < height) {
-      // If we're clicking
-      if (mouseIsPressed) {
-        fill(100,255,200);
-      // Or just rolling over
-      } else {
-        fill(127);
-      }
-    } else {
-      fill(200);
-    }
-    
-    // Oh if we're playing teh song, let's highlight it too
-    if (autoplay && i === song[index-1].note) {
-      fill(100,255,200);
-    }
-    
-    // Draw the key
-    rect(x, 0, w-1, height-1); 
-  }
+  var modAmp = map(mouseX, 0, width, 0, 1);
+  modulator.amp(modAmp, 0.01); // fade time of 0.1 for smooth fading
 
+  // analyze the waveform
+  waveform = fft.waveform();
+
+  // draw the shape of the waveform
+  drawWaveform();
+
+  drawText(modFreq, modAmp);
 }
 
-// When we click
-function mousePressed() {
-  // Map mouse to the key index
-  var key = floor(map(mouseX, 0, width, 0, notes.length));
-  playNote(notes[key]);
+function drawWaveform() {
+  stroke(240);
+  strokeWeight(4);
+  beginShape();
+  for (var i = 0; i<waveform.length; i++){
+    var x = map(i, 0, waveform.length, 0, width);
+    var y = map(waveform[i], -1, 1, -height/2, height/2);
+    vertex(x, y + height/2);
+  }
+  endShape();
 }
 
-// Fade it out when we release
-function mouseReleased() {
-  osc.fade(0,0.5);
+function drawText(modFreq, modAmp) {
+  strokeWeight(1);
+  text('Modulator Frequency: ' + modFreq.toFixed(3) + ' Hz', 20, 20);
+  text('Modulator Amplitude: ' + modAmp.toFixed(3), 20, 40);
 }
