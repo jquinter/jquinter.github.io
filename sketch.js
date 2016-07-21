@@ -3,7 +3,7 @@ var modulator; // this oscillator will modulate the amplitude of the carrier
 var fft; // we'll visualize the waveform 
 
 function setup() {
-  createCanvas(800,400);
+  createCanvas(window.innerWidth*0.99,window.innerHeight*0.99);
   noFill();
   background(30); // alpha
 
